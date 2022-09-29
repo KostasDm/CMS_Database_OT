@@ -1,0 +1,93 @@
+# SQC parameters for querying from Database
+
+
+SQC_parameters:
+
+  IV:
+     table_headers: ['SENSOR', 'VOLTS', 'CURRNT_AMP', 'TEMP_DEGC', 'RUN_NUMBER']
+     sql_table_prefix: iv
+     unit: 'nA'
+     scaling: 1
+     Limit: 3125
+     label: 'Total Current@600V'
+
+
+
+  CV:
+     table_headers: ['SENSOR', 'VOLTS', 'CAP_PFRD', 'RUN_NUMBER']
+     sql_table_prefix: cv 
+     unit: 'pF'
+     scaling: 1
+     Limit: 350
+     label: '1\C2'
+
+
+
+  Istrip:
+     table_headers: ['SENSOR', 'STRIP', 'CURRNT_NAMPR', 'RUN_NUMBER']
+     sql_table_prefix: is
+     factor_2-S: 5
+     factor_PSS: 2.5 
+     Limit: 10
+     label: 'Strip Current [nA/cm]'
+     annotation: '< 10 nA/cm'
+     low: 0
+     up: 0.5
+
+
+  Rpoly:
+     table_headers: ['SENSOR', 'STRIP', 'RESSTNC_MOHM', 'RUN_NUMBER']
+     sql_table_prefix: rs
+     factor_2-S: 1
+     factor_PSS: 1
+     Limit: 1.5
+     label: 'Polysilicon Resistance [MOhm]'
+     annotation: '1.5 +/- 0.5 MOhm'
+     low: 1.0
+     up: 2.2
+
+
+  Cac:
+     table_headers: ['SENSOR', 'STRIP', 'CAPCTNC_PFRD', 'RUN_NUMBER']
+     sql_table_prefix: cs
+     factor_2-S: 112.5
+     factor_PSS: 62.5
+     Limit: 1.2
+     label: 'Coupling Capacitance [pF/(cm*um)]'
+     annotation: '> 1.2 pF/(cm*um)'
+     low: 1.2
+     up: 1.35
+
+  Idiel:
+     table_headers: ['SENSOR', 'STRIP', 'CURRNTPH_NAMP', 'RUN_NUMBER']
+     sql_table_prefix: phs
+     factor_2-S: 1
+     factor_PSS: 1
+     Limit: 10
+     label: 'Dielectric Current [nA/cm]'
+     annotation: '< 10 nA@10V'
+     low: 0
+     up: 300
+
+
+  Cint:
+     table_headers: ['SENSOR', 'STRIPCOUPLE', 'CAPCTNC_PFRD', 'RUN_NUMBER']
+     sql_table_prefix: cis
+     factor_2-S: 5
+     factor_PSS: 2.5
+     Limit: 0.5
+     label: 'Inter-strip Capacitance [pF/cm]'
+     annotation: '< 0.5 pF/cm'
+     low: 0.1
+     up: 1.0
+
+  Rint:
+     table_headers: ['SENSOR', 'STRIPCOUPLE', 'RESSTNC_GOHM', 'RUN_NUMBER']
+     sql_table_prefix: ris
+     factor_2-S: 0.2
+     factor_PSS: 0.4
+     Limit: 10
+     label: 'Inter-strip Resistivity [GOhm*cm ]'
+     annotation: '> 10 GOhm*cm'
+     low: 10
+     up: 4500
