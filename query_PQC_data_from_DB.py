@@ -9,7 +9,7 @@ import os
 
 
 
-parameters = ['CV']#'IV', 'CV', 'FET']
+parameters = ['IV', 'CV', 'FET']
 
 
 
@@ -25,51 +25,23 @@ def read_yml_configuration(yml_file):
 
 
 
-def query_data_from_DB(table_header_list, sql_table_prefix, parameter):
+def query_data_from_DB(query,  parameter):
 
   
   print('The query of {} PQC data from the CMS DB is gonna take a while'.format(parameter))
 
- 
-  if parameter == 'FET':
-       
-       p1 = subprocess.run(['python3', 'rhapi.py', '-n', '--login', '-all', '--url=https://cmsdca.cern.ch/trk_rhapi',
-                      "select d.{}, d.{}, d.{}, d.{} from trker_cmsr.c{} d".format(*table_header_list, sql_table_prefix)], capture_output=True)
-
-  else:
-       
-       p1 = subprocess.run(['python3', 'rhapi.py', '-n', '--login', '-all', '--url=https://cmsdca.cern.ch/trk_rhapi',
-                      "select d.{}, d.{}, d.{}, d.{}, d.{}, d.{}, d.{}, d.{} from trker_cmsr.c{} d".format(*table_header_list, sql_table_prefix)], capture_output=True)
+      
+  p1 = subprocess.run(['python3', 'rhapi.py', '-n', '--login', '-all', '--url=https://cmsdca.cern.ch/trk_rhapi',
+                      "{}".format(query)], capture_output=True)
   
        
   answer = p1.stdout.decode().splitlines()
-  print(answer)
   print('Query of {} PQC data is complete'.format(parameter))
   
   return answer
 
 
- 
-
-
-  
-def query_metadata_table_from_DB():
-
-
-  print('Querying the metadata information from the CMS DB')
-
-  p1 = subprocess.run(['python3', 'rhapi.py', '-n', '--login', '-all', '--url=https://cmsdca.cern.ch/trk_rhapi',
-      "select d.CONDITION_DATA_SET_ID, d.PART_ID, d.PART_NAME_LABEL, d.KIND_OF_HM_FLUTE_ID, d.KIND_OF_HM_STRUCT_ID, d.KIND_OF_HM_CONFIG_ID, d.KIND_OF_HM_SET_ID, d.FILE_NAME  from trker_cmsr.c8920 d"], capture_output=True)
-
-  answer = p1.stdout.decode().splitlines()
-  
-  print('Query of metadata information is complete')
-
-  return answer
-
-
-
-
+   
  
   
 def save_DB_table_as_json(answer_from_DB, filename):
@@ -100,11 +72,7 @@ def process_list_with_data(data):
       
     
    return split_data
-   
-
-
-
-  
+    
 
 
 
@@ -112,14 +80,10 @@ def generate_json_with_data(pqc_parameters):
 
   for i in parameters:
     
-      headers = pqc_parameters[str(i)]['table_headers']
-      sql_table = pqc_parameters[str(i)]['sql_table_prefix']
-      answer_from_DB = query_data_from_DB(headers, sql_table, str(i))
+      query = pqc_parameters[str(i)]['query']
+      
+      answer_from_DB = query_data_from_DB(query, str(i))
       save_DB_table_as_json(answer_from_DB, str(i))
-
-  metadata_answer = query_metadata_table_from_DB() 
-  save_DB_table_as_json(metadata_answer, 'metadata')
-
 
 
 

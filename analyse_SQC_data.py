@@ -9,9 +9,9 @@ import seaborn as sns
 from pretty_html_table import build_table
 import warnings
 from scipy.interpolate import CubicSpline
-from analysis_tools import SQC_tools
+import test as t
+import analysis_tools as tools
 
-#from analyse_PQC_data import vdp_bulk
 
 pd.options.mode.chained_assignment = None
 
@@ -19,7 +19,7 @@ pd.options.mode.chained_assignment = None
 ########################################################################################################################################
 
 
-class runs(SQC_tools):
+class runs:
 
 # Class which process the SQC information fetced from runs SQL table. It includes the run_number 
 # and most importantly the location of the QC center
@@ -33,12 +33,16 @@ class runs(SQC_tools):
 
     def runs_dataframe(self):
 
-      runs_df = SQC_tools.make_dataframe(self, self.measurement, 'runs', ['Time', 'Location', 'Type', 'Run_number'])
+      runs_df = tools.make_dataframe(self.measurement, 'runs', ['Location', 'Type', 'Run_number'])
       
       # Filter out the PQC data
-      runs_df = runs_df.loc[runs_df['Type'].isin(['SQC', 'VQC'])].drop_duplicates(subset=['Run_number', 'Location'], keep='first')
-     
-   
+      runs_df = runs_df.loc[runs_df['Type'].isin(['SQC', 'VQC'])]
+      
+      
+      runs_df = runs_df.drop_duplicates(subset=['Run_number', 'Location'], keep='first')
+ 
+    
+
       return runs_df
 
 
@@ -47,9 +51,9 @@ class runs(SQC_tools):
 
 
 
-class bad_Strips(SQC_tools):
+class bad_Strips:
 
- # This class analyses the data which correspond to the bad strips detected by HPK
+ # This class analyses the data which correspond to the bad strips detected from HPK
 
 
 
@@ -59,9 +63,10 @@ class bad_Strips(SQC_tools):
 
 
 
+
     def run(self):
 
-      bad_strips_df = SQC_tools.make_dataframe(self, self.measurement, 'bad_strips', ['Sensor', 'Defect', 'Strip'])
+      bad_strips_df = tools.make_dataframe(self.measurement, 'bad_strips', ['Sensor', 'Defect', 'Strip'])
 
        
 
@@ -73,7 +78,7 @@ class bad_Strips(SQC_tools):
 
 
 
-class SQC_summary(SQC_tools):
+class SQC_summary():
 
     # This class produces html tables with the information of sensors with known problems or bad sensors, tested at SQC centers 
 
@@ -91,7 +96,7 @@ class SQC_summary(SQC_tools):
         
         df = pd.merge(df, df_sqc_data[['Sensor', 'Location']], how='left', on=['Sensor'])
                 
-        SQC_tools.make_html_table(self, df, 'red_dark', '{}_sensors_with_problems'.format(sensor_type))
+        tools.make_html_table(df, 'red_dark', '{}_sensors_with_problems'.format(self.measurement, sensor_type))
 
 
 
@@ -103,11 +108,10 @@ class SQC_summary(SQC_tools):
 
         df = pd.merge(df, df_sqc_data[['Sensor', 'Location']], how='left', on=['Sensor'])
         
-        SQC_tools.make_html_table(self, df, 'red_dark', '{}_bad_sensors'.format(self.measurement, sensor_type))
-      
-      
-    
-       
+        tools.make_html_table(df, 'red_dark', '{}_bad_sensors'.format(self.measurement, sensor_type))
+
+
+
 
     def run(self):
 
@@ -115,14 +119,9 @@ class SQC_summary(SQC_tools):
        
        for sensor_type in ['2-S', 'PS-s']: 
            
-           summary_df = SQC_tools.make_dataframe(self, self.measurement, 'summary_{}_sensors'.format(sensor_type), ['Sensor', 'Batch', 'Serial_number', 'Description', 'Sensor_type', 'Status', 'Known_problem'])
-           summary_df = SQC_tools.find_sensor(self, summary_df)
-           summary_df = SQC_tools.convert_serial_from_binary(self, summary_df)
-           
-           
-           
+           summary_df = tools.make_dataframe(self.measurement, 'summary_{}_sensors'.format(sensor_type), ['Sensor', 'Batch', 'Description', 'Sensor_type', 'Status', 'Known_problem'])
+        
            self.find_bad_sensors(summary_df, self.df_sqc_data, sensor_type)
-           
 
            self.find_sensors_with_problems(summary_df, self.df_sqc_data, sensor_type)
 
@@ -146,7 +145,6 @@ class IV(runs):
 
     def __init__(self, iv):
 
-       
         self.iv = iv
         
         self.config_file = db.read_yml_configuration('SQC_parameters_DB.yml')
@@ -159,9 +157,12 @@ class IV(runs):
        
         ##scales the current at 21oC
 
-        df[[self.iv, 'Temp']] = df[[self.iv, 'Temp']].apply(pd.to_numeric, errors='coerce').abs()
+        df[self.iv] = pd.to_numeric(df[self.iv]).abs()
 
-        df['Temp']  = df['Temp'].mask(df['Temp'].isnull()==True, float(25)) # assigns a temperature of 25oC to HPK data
+        df['Temp'] = pd.to_numeric(df['Temp'])
+
+        df['Temp']  = df['Temp'].mask(df['Temp'].isnull()==True, float(25)) # assigns 25oC to HPK data
+
     
         df['I_scaled'] = (df[self.iv]*21)/df['Temp']
 
@@ -187,7 +188,7 @@ class IV(runs):
 
         df_HPK = df_HPK.groupby(['Batch', 'Sensor_type']).agg(Wafers=('Batch', 'count'))
         df_HPK = df_HPK.reset_index()
-      
+
         df_HPK['Wafers'] = pd.to_numeric(df_HPK['Wafers'])
 
         df_2S_only = df_HPK.loc[df_HPK['Sensor_type'].str.contains('2-S')]
@@ -201,45 +202,33 @@ class IV(runs):
 
         fig, ax = plt.subplots()
         sns.scatterplot(data=df_HPK, x='Batch', y='Wafers', hue='Sensor_type', s=27, linewidth=0, ax=ax)
-        xticks = ax.get_xticks()
-        ax.set_xticks(xticks[::len(list(dict.fromkeys(df['Batch'])))//40])  
-        ax.tick_params(axis='x', rotation=90, labelsize = 6)
+        plt.xticks(df_HPK['Batch'], df_HPK['Batch'], rotation=90, va='top', fontsize=6)
+        plt.locator_params(axis='x', nbins=len(df_HPK['Batch'])/4)
         ax.set(xlabel=None)
         plt.axhline(y=75, linestyle='dashed', color='blue') 
         plt.axhline(y=30, linestyle='dashed', color='orange')
         plt.text(26, 65, 'PS-s low yield batches: {}/{}'.format(low_yield_PSS_df.shape[0], df_PSS_only.shape[0]), color='blue', style='italic', fontsize=11)
 
         plt.text(26, 25, '2-S low yield batches: {}/{}'.format(low_yield_2S_df.shape[0], df_2S_only.shape[0]), color='orange', style='italic', fontsize=11)
-        ax.set_ylabel('Number of Sensors', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Number of Wafers', fontsize=12, fontweight='bold')
         plt.legend(loc='best')
         plt.savefig('Figures/{}/batches_over_time.pdf'.format(self.measurement))
 
-             
+
 
 
     def plot_itot_over_time(self, df, label):
 
 
         ## plots the scaled current at -600(-800) V over batch number
-  
+
         batch = list(dict.fromkeys(df['Batch']))
-       
         df = df.loc[df['I_scaled']>10]
-        df['Time'] = pd.to_datetime(df['Time'], errors = 'coerce')
-        
-        #df['New'] = df.groupby('Sensor')['I_scaled']#.diff()
-              
-        df = df.sort_values('Time').drop_duplicates(['Sensor', 'Location'], keep='last')
-        
-   
-        
         fig, ax = plt.subplots()
         sns.scatterplot(data = df, x='Batch', y='I_scaled', hue='Sensor_type', s=25, linewidth=0, ax=ax)
-        
-        xticks = ax.get_xticks()
-        ax.set_xticks(xticks[::len(batch)//40])  
-        ax.tick_params(axis='x', rotation=90, labelsize = 6)
-        
+         
+        plt.xticks(batch, batch, rotation=90, va='top', fontsize = 6)
+        plt.locator_params(axis='x', nbins=len(batch)/4)
         ax.set(xlabel=None)
 
         plt.axvline(x=22, linestyle='dashed', color='black')
@@ -252,18 +241,16 @@ class IV(runs):
         plt.text(26, 1000, 'Production Period', style ='italic')
         plt.yscale('log')
 
-        #plt.figtext(0.4, 0.01, r'Time evolution $\longrightarrow$', fontsize=10, fontweight='bold')
+        plt.figtext(0.4, 0.01, r'Time evolution $\longrightarrow$', fontsize=10, fontweight='bold')
         ax.set_ylabel('Total Current@-{} V [nA]'.format(label), fontsize = 12, fontweight='bold')
 
         plt.legend(loc='best')
         plt.savefig('Figures/{}/i_{}_sensor_type.pdf'.format(self.measurement, label))
-     
-        
-        
-        plt.clf()          
+
+        plt.clf()                
 
 
-        
+
 
     def plot_itot_histogram(self, df, label):
 
@@ -277,7 +264,7 @@ class IV(runs):
         plt.xscale('log')
         ax.set_ylabel('Number of Sensors')
         ax.set_xlabel('Total Current@-{} V [nA]'.format(label), fontsize = 12, fontweight='bold')
-        plt.savefig('Figures/{}/i_{}_histogram.png'.format(self.measurement, label))
+        plt.savefig('Figures/{}/i_{}_histogram.pdf'.format(self.measurement, label))
         plt.clf()
 
 
@@ -314,31 +301,16 @@ class IV(runs):
         plt.clf()
 
 
-    def boxplot(self, df):
-    
-       plt.clf()
-       df = df.loc[df['Location']=='Hamamatsu']
-       
-       fig, ax = plt.subplots()
-       sns.boxplot(data = df, y='Sensor_type', x='I_scaled')
-       #xticks = ax.get_xticks()
-       #ax.set_xticks(xticks[::len(list(dict.fromkeys(df['Batch'])))//10])  
-       #ax.tick_params(axis='x', rotation=90, labelsize = 6)
-       plt.show()
-       
-       plt.clf()
-    
-       
+
 
     def run(self):
 
-        itot_df = SQC_tools.make_dataframe(self, self.measurement, self.iv, ['Sensor', 'Volts', self.iv, 'Temp', 'Run_number'])
+        itot_df = tools.make_dataframe(self.measurement, self.iv, ['Sensor', 'Volts', self.iv, 'Temp', 'Run_number'])
 
-        
-        i600_df = SQC_tools.filter_dataframe(self, itot_df, 'Volts', 599, 601)
+         
+        i600_df = tools.filter_dataframe(itot_df, 'Volts', 599, 601)
                  
-        i800_df = SQC_tools.filter_dataframe(self, itot_df, 'Volts', 799, 801)
-        
+        i800_df = tools.filter_dataframe(itot_df, 'Volts', 799, 801)
         
 
         runs_df = self.runs_dataframe()
@@ -346,7 +318,10 @@ class IV(runs):
 
         for df, label in ((i600_df, '600'), (i800_df, '800')):
         
-           df_final = SQC_tools.sqc_sequence(self, df, runs_df)
+           df_final = tools.sqc_sequence(df, runs_df)
+
+
+           #df_final = pd.merge(df_final, runs_df, how='left', on=['Run_number']) 
 
            
            df_final = self.scale_current(df_final)
@@ -354,12 +329,12 @@ class IV(runs):
          
           # self.make_table_with_outliers(df_final, 'dark_blue', 'IV_sensors_out_of_specs')
            self.plot_batches_over_time(df_final)
-           self.boxplot(df_final)
+           '''
            self.plot_itot_over_time(df_final, label)
-           #self.plot_itot_histogram(df_final, label)
+           self.plot_itot_histogram(df_final, label)
            if label=='600':
                self.plot_number_of_delivered_sensors(df_final)
-         
+           '''
            
            
            return df_final
@@ -385,7 +360,55 @@ class CV(runs):
         self.config_file = db.read_yml_configuration('SQC_parameters_DB.yml')
         self.measurement = 'SQC'
 
-   
+        
+
+
+    def analyse_cv(self, v, c, cut_param=0.004, debug=False):
+
+      # init
+      v_dep2 = -1
+
+    #  c = [1/i**2 for i in c]
+    
+
+
+      # get spline fit, requires strictlty increasing array
+      y_norm = c/np.max(c)
+      x_norm = np.arange(len(y_norm))
+      spl = CubicSpline(x_norm, y_norm)
+      spl_dev = spl(x_norm, 1)
+
+
+      # get regions for indexing
+      idx_rise = [ i for i in range(len(spl_dev)) if (abs(spl_dev[i]) > cut_param) ]
+      idx_const = [ i for i in range(len(spl_dev)) if (abs(spl_dev[i]) < cut_param) ]
+
+      with warnings.catch_warnings():
+         warnings.filterwarnings('error')
+
+         try:
+            v_rise = v[ idx_rise[-6]:idx_rise[-1]+1 ]
+            v_const = v[ idx_const[1]:idx_const[-1]+1 ]
+            c_rise = c[ idx_rise[-6]:idx_rise[-1]+1 ]
+            c_const = c[ idx_const[1]:idx_const[-1]+1 ]
+
+            # line fits to each region
+            a_rise, b_rise = np.polyfit(v_rise, c_rise, 1)
+            a_const, b_const = np.polyfit(v_const, c_const, 1)
+
+            # full depletion via intersection
+            v_dep2 = (b_const - b_rise) / (a_rise - a_const)
+
+
+         except (ValueError, TypeError, IndexError):
+
+            print("The array seems empty. Try changing the cut_param parameter.")
+
+      return  v_dep2
+
+
+
+
 
     def find_vfd(self, df):
 
@@ -403,8 +426,8 @@ class CV(runs):
         df_new = pd.DataFrame()
         for i in dataframe:
           try: 
-               x, vfd, rho = SQC_tools.analyse_cv(self, i['Volts'].values, (1/i[self.cv]**2).values)
-              
+               x, vfd = t.analyse_cv(i['Volts'].values, (1/i[self.cv]**2).values)
+
           except Exception as err:
             
               vfd=np.nan
@@ -440,7 +463,10 @@ class CV(runs):
 
         df = df.dropna()
         df['Vfd'] = pd.to_numeric(df['Vfd'])
-        
+        #df = df.loc[df['Vfd']>0]
+         
+        print(df.loc[df['Vfd']>320].to_string())   
+
 
         return df
 
@@ -463,25 +489,33 @@ class CV(runs):
     
     def plot_vfd_over_time(self, df):
 
-     
+
+        ## plots the scaled current at -600(-800) V over batch number
 
         batch = list(dict.fromkeys(df['Batch']))
 
         fig, ax = plt.subplots()
-        sns.scatterplot(data = df, x='Batch', y='Vfd', hue='Sensor_type', s=25, linewidth=0, ax=ax) 
+        sns.scatterplot(data = df, x='Batch', y='Vfd',  hue='Sensor_type', s=25, linewidth=0, ax=ax)
          
-        xticks = ax.get_xticks()
-        ax.set_xticks(xticks[::len(batch)//40])  
-        ax.tick_params(axis='x', rotation=90, labelsize = 6)
+        plt.xticks(batch, batch, rotation=90, va='top', fontsize = 6)
+        plt.locator_params(axis='x', nbins=len(batch)/4)
         ax.set(xlabel=None)
 
-        plt.axhline(y = 350, linestyle ='dashed', color='black')
+        #plt.axvline(x=22, linestyle='dashed', color='black')
+        #plt.axhline(y = 3125, linestyle ='dashed', color='blue')
         
-        plt.text(26, 380, 'Limit at 350V', color = 'red', style ='italic', fontsize = 12)
+        #plt.axhline(y = 7250, linestyle ='dashed', color='orange')
+        #plt.text(26, 2000, 'PS-s/PS-p limit', color = 'blue', style ='italic', fontsize = 12)
        
+        #plt.text(26, 8500, '2-S limit', color = 'orange', style ='italic', fontsize = 12)
+        #plt.text(26, 1000, 'Production Period', style ='italic')
+
+
+        plt.figtext(0.4, 0.01, r'Time evolution $\longrightarrow$', fontsize=10, fontweight='bold')
         ax.set_ylabel('Full Depletion Voltage [V]', fontsize = 12, fontweight='bold')
 
- 
+        plt.legend(loc='best')
+        #plt.show()
         plt.savefig('Figures/SQC/vfd_evolution.pdf')
 
 
@@ -491,20 +525,20 @@ class CV(runs):
 
         runs_df = self.runs_dataframe()
 
-        df = SQC_tools.make_dataframe(self, self.measurement, self.cv, ['Sensor', 'Volts', self.cv, 'Run_number'])
+        df = tools.make_dataframe(self.measurement, self.cv, ['Sensor', 'Volts', self.cv, 'Run_number'])
 
 
-        df = SQC_tools.find_location_SQC(self, runs_df, df, 'Sensor')
+        df = tools.find_location_SQC(runs_df, df, 'Sensor')
 
 
         new_df= self.assign_vfd(df)
         
-        new_df = SQC_tools.find_batch(self, new_df, 'Sensor')
-        new_df = SQC_tools.find_wafer_type(self, new_df, 'Sensor')
+        new_df = tools.find_batch(new_df, 'Sensor')
+        new_df = tools.find_wafer_type(new_df, 'Sensor')
         
         print(new_df)
         #self.plot_vfd_histogram(new_df)
-        self.plot_vfd_over_time(new_df)
+        #self.plot_vfd_over_time(new_df)
         
         return new_df
 
@@ -532,27 +566,17 @@ class strip_parameter(runs):
 
 
 
-  def find_bad_strip(self, df, ylabel, condition):
+  def find_bad_strip(self, df, ylabel):
       
     
 
-    out_of_specs_df = SQC_tools.find_SQC_values_out_of_specs(self, df, self.parameter, self.config_file)
+    out_of_specs_df = tools.find_SQC_values_out_of_specs(df, self.parameter, self.config_file)
     
     
     if not out_of_specs_df.empty:
     
-          SQC_tools.make_html_table(self, out_of_specs_df, 'green_light', '{}_{}_{}_out_of_specs'.format(self.measurement, self.parameter, ylabel))
-          if condition=='all_strips':
-       
-             plt.clf()
-            
-             sns.histplot(data= out_of_specs_df, x= 'Batch', hue='Location')
-             plt.xticks(rotation=90, va='top', fontsize = 6)
- 
-             plt.ylabel('Strips')
-             plt.title('{} - out of specifications'.format(self.parameter))
-             plt.savefig('{}_histogram_out_of_specs.png'.format(self.parameter))
-             plt.clf()
+          tools.make_html_table(out_of_specs_df, 'green_light', '{}_{}_{}_out_of_specs'.format(self.measurement, self.parameter, ylabel))
+
 
 
 
@@ -621,7 +645,13 @@ class strip_parameter(runs):
   
     fig, ax = plt.subplots()
 
-    upper, lower = SQC_tools.find_outliers(self, df, self.config_file['SQC_parameters'][self.parameter], self.parameter)
+    upper, lower = tools.find_outliers(df, self.config_file['SQC_parameters'][self.parameter], self.parameter)
+
+
+   # hist, bins, _ = plt.hist(df[self.parameter], bins=30)
+   # print(bins)
+    #logbins = np.logspace(np.log10(bins[1]), np.log10(bins[-1]), len(bins))
+    #if self.parameter=='Rint':
 
 
     
@@ -654,9 +684,8 @@ class strip_parameter(runs):
         fig, ax = plt.subplots()
         sns.scatterplot(data = df, x='Batch', y=self.parameter, hue='Sensor_type', s=25, linewidth=0, ax=ax)
          
-        xticks = ax.get_xticks()
-        ax.set_xticks(xticks[::len(batch)//40])  
-        ax.tick_params(axis='x', rotation=90, labelsize = 6)
+        plt.xticks(batch, batch, rotation=90, va='top', fontsize = 6)
+        plt.locator_params(axis='x', nbins=len(batch)/4)
         ax.set(xlabel=None)
 
         plt.axvline(x=16, linestyle='dashed', color='black')
@@ -691,14 +720,9 @@ class strip_parameter(runs):
       
       runs_df = self.runs_dataframe()
 
-      df = SQC_tools.make_dataframe(self, self.measurement, self.parameter, ['Sensor', 'Strip', self.parameter, 'Run_number'])
+      df = tools.make_dataframe(self.measurement, self.parameter, ['Sensor', 'Strip', self.parameter, 'Run_number'])
     
-      df = SQC_tools.sqc_sequence(self, df, runs_df)  
-      
-      if self.parameter=='Istrip':
-          print(df['Istrip'])
-          df['Istrip'] = pd.to_numeric(df['Istrip'])
-          print(df.loc[df['Istrip'].abs()>1].to_string())
+      df = tools.sqc_sequence(df, runs_df)  
      
       df = self.normalize_data(df)
 
@@ -716,7 +740,7 @@ class strip_parameter(runs):
              y_label = 'sensors'
       
           
-          self.find_bad_strip(df, y_label, i)
+          self.find_bad_strip(df, y_label)
           
           self.plot_distribution(df, i, y_label)
          
